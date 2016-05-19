@@ -5,9 +5,9 @@ as well as capturing requests using Postman. (https://chrome.google.com/webstore
 
 */
 
-var consumerKey = ''; // Can be found at http://schoology.yourDomainName.whatever/api
+var consumerKey = 'YOURCONSUMERKEYHERE'; // Can be found at http://schoology.yourDomainName.whatever/api
 
-var consumerSecret = ''; // Can be found at http://schoology.yourDomainName.whatever/api
+var consumerSecret = 'YOURCONSUMERSECRETHERE'; // Can be found at http://schoology.yourDomainName.whatever/api
 
 var signatureMethod = 'PLAINTEXT'; // This is the signature generation method used for Oauth. For https connection, plaintext works fine. See https://developers.schoology.com/api-documentation/authentication for details. 
 
@@ -15,7 +15,7 @@ var baseUrl = 'https://api.schoology.com/v1/'; // API calls are made to urls whi
 
 var authVersion = '1.0'; // Current Oauth version used.
 
-var spreadsheetId = ''; // Google spreadsheet where Schoology info should be dumped.
+var spreadsheetId = 'YOURSPREADSHEETIDHERE'; // Google spreadsheet where Schoology info should be dumped.
 
 
 /********
