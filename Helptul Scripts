@@ -1,0 +1,788 @@
+/*
+
+API urls were figured out using the documentation at https://developers.schoology.com/api
+as well as capturing requests using Postman. (https://chrome.google.com/webstore/detail/postman/fhbjgbiflinjbdggehcddcbncdddomop?hl=en)
+
+*/
+
+var consumerKey = ''; // Can be found at http://schoology.yourDomainName.whatever/api
+
+var consumerSecret = ''; // Can be found at http://schoology.yourDomainName.whatever/api
+
+var signatureMethod = 'PLAINTEXT'; // This is the signature generation method used for Oauth. For https connection, plaintext works fine. See https://developers.schoology.com/api-documentation/authentication for details. 
+
+var baseUrl = 'https://api.schoology.com/v1/'; // API calls are made to urls which start this way.
+
+var authVersion = '1.0'; // Current Oauth version used.
+
+var spreadsheetId = ''; // Google spreadsheet where Schoology info should be dumped.
+
+
+/********
+
+getSchoolId() logs and returns your school's id.
+
+*******/
+
+function getSchoolId(){
+  
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+
+  var apiUrl = 'schools';
+  
+  var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+  var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+
+  var schoolId = JSON.parse(response).school[0].id; // Grab the school id and store it.
+  
+  Logger.log('School Id = ' + schoolId + '\n');
+  return(schoolId);
+  
+}
+
+
+/********
+
+getBuildings() logs and returns an array containing your school buildings' names and ids.
+
+*******/
+
+function getBuildings(){
+
+  var schoolId = getSchoolId();
+  
+  Utilities.sleep(1000); // Must delay in order to get different timestamps sent to Schoology.
+  
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+
+  var apiUrl = 'schools/' + schoolId + '/buildings';
+  
+  var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+  var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+
+  var buildings = [];
+  
+  var data = JSON.parse(response).building; // Grab the info we're really after.
+  
+  for(var i = 0; i < data.length; i++){
+  
+    buildings.push([data[i].title, data[i].id]); // Store the name and id of each building and put it into an array.
+  
+  }
+  
+  Logger.log('Building Info = ' + buildings + '\n');
+  return(buildings); 
+}
+
+
+
+/********
+
+getAllCourses() logs and returns all your school's courses and related information. It also dumps this information in a spreadsheet for easier access.
+
+*******/
+
+function getAllCourses(){ 
+
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+ 
+  var apiUrl = 'courses';
+  
+  var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+  var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+  
+  var data = JSON.parse(response).course; // Grab the info we're really after.
+  
+  var totalCourses = JSON.parse(response).total; // Check to see what the total number of courses is.
+  
+  var courses = [];
+  
+  var startVal = 1;
+  var limit = 200; // This seems to be Schoology's upper limit of values that can be returned.
+  
+  var keys = [];
+    
+    for(var k in data[0]){
+    
+    keys.push(k);
+    
+  }
+    
+    courses.push(keys);  // Set first row of data to be all Schoology course variables.
+
+  while(courses.length < totalCourses){ // Make sure to get all courses. You can only get 200 at a time.
+
+    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+   
+    var d = new Date();
+    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+    var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+    
+    var url = baseUrl + apiUrl + '?start=' + startVal + '&limit=' + limit + '&oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+    var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+    data = JSON.parse(response).course; // Grab the info we're really after.
+    
+
+    for(var i = 0; i < data.length; i++){ 
+    
+    var array = [];
+     
+    for(var k in data[0]){ // Loop through all the keys (column names) for this json object.
+      
+      var course = data[i]; // For each course...
+      
+      array.push(course[k]); // ...grab all the values of all the keys for that course...
+      
+    }
+    
+    courses.push(array); // ... and add it to the courses array.
+    
+    }
+   
+    startVal = startVal + limit; // Next time through the loop, get the next (up to) 200 values.
+  }    
+  
+   // Dump section info to a spreadsheet.
+  
+  var ss = SpreadsheetApp.openById(spreadsheetId); 
+  
+  var sheet = getOrCreateSheetByName(ss, "Schoology Course Data"); // See helper functions script file to the left.
+    
+  sheet.getRange(1,1,courses.length, courses[0].length).setValues(courses);
+  
+  Logger.log('Course Info = ' + courses + '\n');
+  return(courses);
+}
+
+
+
+
+
+
+/********
+
+getAllUsers() logs and returns all your school's users, and dumps each field of information for the student in a spreadsheet.
+
+*******/
+
+function getAllUsers(){ 
+  
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+  
+  var apiUrl = 'users';
+  
+  var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+  var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+  var data = JSON.parse(response).user; // Grab the info we're really after.
+  
+  var totalUsers = JSON.parse(response).total; // Check to see what the total number of users is.
+  
+  var users = [];
+  
+  var startVal = 1;
+  var limit = 200;
+  
+  var keys = [];
+  
+  for(var k in data[0]){ // Get all the keys (column names) for this json object and store them in an array.
+      
+      keys.push(k);
+      
+    }
+    
+    users.push(keys);  // Set first row of data to be all Schoology user variables.
+
+  
+  while(users.length < totalUsers){ // Make sure to get all users. You can only get 200 at a time.
+
+    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+    var d = new Date();
+    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+    var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+    
+    var url = baseUrl + apiUrl + '?start=' + startVal + '&limit=' + limit + '&oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+    var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+
+    data = JSON.parse(response).user; // Grab the info we're really after.
+    
+    
+    
+    
+    for(var i = 0; i < data.length; i++){
+      
+      var array = [];
+      
+      for(var k in data[0]){
+      
+        var user = data[i];
+        
+        array.push(user[k]);
+        
+      }
+      
+    users.push(array);
+      
+    }
+    
+    startVal = startVal + limit;  
+  }    
+  
+  
+  // Dump user info to a spreadsheet.
+
+  var ss = SpreadsheetApp.openById(spreadsheetId); 
+  
+  var sheet = getOrCreateSheetByName(ss, "Schoology User Data"); // See helper functions script file to the left.
+     
+  sheet.getRange(1,1,users.length, users[0].length).setValues(users);
+  
+  Logger.log('User Info = ' + users + '\n');
+  return(users);
+}
+
+
+
+
+
+/********
+
+getAllSections() logs and returns all your school's course sections, and dumps each field of information for the section in a spreadsheet.
+
+*******/
+
+function getAllSections(){ 
+
+  var d = new Date();
+  var startTime = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var currentTime = startTime; // Initialize currentTime variable for use in checking for script timeouts.
+  
+  var scriptProperties = PropertiesService.getScriptProperties(); // If this is a brand new run, values below will be null. If last time this was run, it fully completed, these will be 0 each. If we're in the middle of a run, then these store values where we left off.
+  var startingIndex = Number(scriptProperties.getProperty("getAllSectionsStartingIndex")); //Coerces null value to 0 and makes sure script doesn't interpret index as a string.
+  var startingRow = Number(scriptProperties.getProperty("getAllSectionsStartingRow")) + 1; //Coerces null value to 1and makes sure script doesn't interpret row number as a string.
+
+  var ss = SpreadsheetApp.openById(spreadsheetId); 
+  
+  var allSheets = ss.getSheets();
+  var allNames = [];
+  
+  // Grab the names of all the sheets in this spreadsheet.
+  for(var h = 0; h < allSheets.length; h++){
+   
+   allNames.push(allSheets[h].getName()); 
+    
+  }
+  
+  if(allNames.indexOf("Schoology Course Data") < 0){ // If course data has not been entered into the spreadsheet yet...
+  
+    throw new Error( "Course data does not exist yet! You must run getAllCourses() first." ); // ... throw error saying we have no course data to work with for grabbing section data!
+    
+  }
+  
+  else{
+        
+    var sheet = ss.getSheetByName("Schoology Course Data"); // ... otherwise grab the course data sheet so we have a array of course ids to work with.
+  
+  }
+    
+  var courseIds = sheet.getRange(2,1,sheet.getLastRow()-1, 1).getValues(); // Grabs all courseIds skipping variable names row at the top.
+
+  var sections = []; // Create empty array for additional section info we're about to grab and dump in a spreadsheet.
+
+  var total = 0; // For use with while loop below.
+  var i = 0; // Just initializing...
+  
+  if(startingIndex+0 == 0){// If this is a brand new run, do this part, otherwise if it's a continuation of a previous run, skip this part.
+   
+    while(total == 0){  // Must get a course with at least 1 section in order to grab the section keys (column titles in the spreadsheet) at add them as the first row of the sections data.
+      
+      Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+      var d = new Date();
+      var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+      var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+      currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
+      
+      
+      if(currentTime - startTime > 4.5*60){ // 4 1/2 minutes. Google Apps script times out after 5 minutes. If we're getting close, set up a continuation script run.
+      
+      scriptProperties.setProperty("getAllSectionsStartingIndex", i); // Set up next run to begin at i+1 index of courseIds.
+      scriptProperties.setProperty("getAllSectionsStartingRow", startingRow + sections.length - 1); // Set up next run to put data in spreadsheet just below last filled row.
+      
+      // This creates an installed trigger for the script to run again after 1 minute. It's the only way to have a script run last more than 5 minutes.
+      ScriptApp.newTrigger("getAllSections")
+      .timeBased()
+      .after(60*1000)
+      .create();
+      
+      break; // And leave the for loop.
+      
+    }
+      
+      var apiUrl = 'courses/' + courseIds[i][0] + '/sections'; // Grabs the course id of the current course and adds it to the api call.
+      
+      var url = baseUrl + apiUrl + '?&oauth_consumer_key=44da8dffeba4f148bd9a2e9ff6f35b65056e0a579&oauth_signature_method=' + "PLAINTEXT" + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=1.0&oauth_signature=' + consumerSecret + '%26'; 
+      
+      var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+ 
+      var data = JSON.parse(response).section; // Grab the info we're really after.
+      total = JSON.parse(response).total; // Check to see what the total number of sections is.
+
+      i++;
+      
+    }
+    
+    var keys = [];
+    
+    for(var k in data[0]){ // Get all the keys (column names) for this json object and store them in an array.
+      
+      keys.push(k);
+      
+    }
+    
+    sections.push(keys);  // Set first row of data to be all Schoology section variables.
+    
+    var array = [];
+    
+    for(var k in data[0]){ // Go through the keys one by one and grab the corresponding value from this section.
+      
+      var section = data[0];
+      
+      array.push(section[k]);
+      
+    }
+    
+    sections.push(array); // Add the values of all the keys for this section to the sections array.
+  }
+  
+  else{ // If a previous run of this function was close to timing out, this picks up where it left off.
+    
+    i = startingIndex;  
+    Logger.log("Continuing previous run! Starting index = " + i + ' and starting row = ' + startingRow);
+    
+  }
+  
+ 
+  for(i; i < courseIds.length; i++){ // Go through courseIds from where we left off above or startingIndex (i) through the end of the array (unless we time out).
+    
+    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+    var d = new Date();
+    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+    var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+    currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
+  
+    
+    if(currentTime - startTime > 4.5*60){ // 4 1/2 minutes. Google Apps script times out after 5 minutes. If we're getting close, set up a continuation script run.
+     
+      scriptProperties.setProperty("getAllSectionsStartingIndex", i); // Set up next run to begin at i+1 index of courseIds.
+      scriptProperties.setProperty("getAllSectionsStartingRow", startingRow + sections.length - 1); // Set up next run to put data in spreadsheet just below last filled row.
+      
+      // This creates an installed trigger for the script to run again after 1 minute. It's the only way to have a script run last more than 5 minutes.
+      ScriptApp.newTrigger("getAllSections")
+      .timeBased()
+      .after(60*1000)
+      .create();
+       
+      break; // And leave the for loop.
+      
+    }
+    
+    var apiUrl = 'courses/' + courseIds[i][0] + '/sections'; // Grabs the course id of the current course and adds it to the api call.
+    
+    var url = baseUrl + apiUrl + '?&oauth_consumer_key=44da8dffeba4f148bd9a2e9ff6f35b65056e0a579&oauth_signature_method=' + "PLAINTEXT" + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=1.0&oauth_signature=' + consumerSecret + '%26'; 
+    
+    var response = UrlFetchApp.fetch(url);
+    var data = JSON.parse(response).section; // Grab the info we're really after.
+    total = JSON.parse(response).total; // Check to see what the total number of sections is.
+    
+    if(total == 0){ // If this course has no sections, skip to next course (go to the start of the for loop).
+     continue;   
+    }
+  
+    // For each section of the course, add all the course properties as a array to the sections array.
+    for(var j = 0; j < data.length; j++){ 
+      
+    var array = [];
+      
+      for(var k in data[0]){ // Go through all keys (section information) one by one.
+        
+        var section = data[j]; //Focus on a single section...
+        
+        array.push(section[k]); // Grab the current key (info) from that section we want and add it to this section's info array.
+        
+      }
+      
+      sections.push(array); // Add all section data for this section to our main sections array.
+      
+    }
+    
+  }
+   
+  // Dump section info to a spreadsheet.
+  
+  var ss = SpreadsheetApp.openById(spreadsheetId); 
+  
+  var sheet = getOrCreateSheetByName(ss, "Schoology Section Data"); // See helper functions script file to the left.
+  
+  sheet.getRange(startingRow,1, sections.length, sections[0].length).setValues(sections); // Add newest section data to the Google sheet.
+  
+  if(i >= courseIds.length){ // If script completed...
+   
+    scriptProperties.setProperty("getAllSectionsStartingIndex", 0); // ...set starting index to 0...
+    scriptProperties.setProperty("getAllSectionsStartingRow", 0); // ... and starting row for spreadsheet to 0 (which changes to 1 right away during a run so 0 is correct!).
+    
+    deleteAllProjectTriggers(); //Delete all timed triggers we made.
+    
+  }
+  
+
+}
+
+
+
+/********
+
+getAllEnrollments() logs and returns all your school course sections' enrollments for all sections, and dumps the info into the sections spreadsheet.
+
+*******/
+
+
+function getAllEnrollments(){ 
+
+  var d = new Date();
+  var startTime = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var currentTime = startTime; // Initialize currentTime variable for use in checking for script timeouts.
+  
+  var scriptProperties = PropertiesService.getScriptProperties(); // If this is a brand new run, values below will be null. If last time this was run, it fully completed, these will be 0 each. If we're in the middle of a run, then these store values where we left off.
+  var startingIndex = Number(scriptProperties.getProperty("getAllEnrollmentsStartingIndex")); //Coerces null value to 0 and makes sure script doesn't interpret index as a string.
+  var startingRow = Number(scriptProperties.getProperty("getAllEnrollmentsStartingRow")) + 1; //Coerces null value to 1and makes sure script doesn't interpret row number as a string.
+
+  var ss = SpreadsheetApp.openById(spreadsheetId); 
+  
+  var allSheets = ss.getSheets();
+  var allNames = [];
+  
+  // Grab the names of all the sheets in this spreadsheet.
+  for(var h = 0; h < allSheets.length; h++){
+   
+   allNames.push(allSheets[h].getName()); 
+    
+  }
+  
+  if(allNames.indexOf("Schoology Section Data") < 0){ // If section data has not been entered into the spreadsheet yet...
+  
+    throw new Error( "Sections data does not exist yet! You must run getAllSections() first." ); // ... throw error saying we have no sections data to work with for grabbing enrollment data!
+    
+  }
+  
+  else{
+        
+    var sheet = ss.getSheetByName("Schoology Section Data"); // ... otherwise grab the sections data sheet so we have a array of section ids to work with.
+  
+  }
+    
+  var sectionIds = sheet.getRange(1,1,sheet.getLastRow(), 2).getValues(); // Grabs all sectionIds and section names including variable names in the top row.
+
+  var allEnrollments = [];
+  
+  if(startingIndex == 0){// If this is a brand new run, do this part, otherwise if it's a continuation of a previous run, skip this part.
+  
+    allEnrollments.push([]);
+    allEnrollments[0].push("Enrollment Id");
+    allEnrollments[0].push("Schoology Id");
+    allEnrollments[0].push("Enrollment Id");
+    allEnrollments[0].push("Schoology Id");
+    allEnrollments[0].push("etc...");
+    
+    for(var rest = 5; rest < 100; rest++){ // Fill in the rest of the values of the first row of the array to be '' that we eventually get a nice rectangular array of sectionIds.length rows and 100 columns;
+        
+        allEnrollments[0].push('');
+        
+      }
+  
+  
+  }
+  
+  else{ // If a previous run of this function was close to timing out, this picks up where it left off.
+    
+    Logger.log("Continuing previous run! Starting index = " + startingIndex + ' and starting row = ' + startingRow);
+    
+  }
+  
+  
+  
+  for(var i = startingIndex + 1; i < sectionIds.length; i++){ // + 1 in order to skip first item because it's the name of the column.
+    
+    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+    var d = new Date();
+    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+    var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+    currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
+    
+    var apiUrl = 'sections/' + sectionIds[i][0] + '/enrollments'; // Grabs the course id of the current course and adds it to the api call.
+    
+    var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+    var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+    
+    var data = JSON.parse(response).enrollment; // Grab the info we're really after.  
+    
+    var enrollments = [];
+    
+    for(var k = 0; k < data.length; k++){
+      
+      enrollments.push(data[k].id);
+      enrollments.push(data[k].uid);
+      
+    }
+    
+    for(var rest = 2*k; rest < 100; rest++){ // Fill in the rest of the values of the array to be '' that we get a nice rectangular array of sectionIds.length rows and 100 columns;
+     
+      enrollments.push('');
+      
+    }
+   
+    allEnrollments.push(enrollments); // Add the enrollments for the current section to the allEnrollments array.
+    
+    if(currentTime - startTime > 4.5*60){ // 4 1/2 minutes. Google Apps script times out after 5 minutes. If we're getting close, set up a continuation script run.
+     
+      scriptProperties.setProperty("getAllEnrollmentsStartingIndex", i); // Set up next run to begin at i+1 index of sectionIds.
+      scriptProperties.setProperty("getAllEnrollmentsStartingRow", startingRow + allEnrollments.length - 1); // Set up next run to put data in spreadsheet just below last filled row.
+      
+      // This creates an installed trigger for the script to run again after 1 minute. It's the only way to have a script run last more than 5 minutes.
+      ScriptApp.newTrigger("getAllEnrollments")
+      .timeBased()
+      .after(60*1000)
+      .create();
+       
+      break; // And leave the for loop.
+      
+    }
+  }
+    
+  // Dump info to spreadsheet.
+  
+  var sheet = getOrCreateSheetByName(ss, "Schoology Enrollment Data");
+  
+  if(startingRow == 0){
+  
+    sheet.getRange(1,1,sectionIds.length,100).clear(); // Clear the sheet (if it already existed) in case students or sections have been added.
+  
+  }
+    
+  sheet.getRange(1,1,sectionIds.length,2).setValues(sectionIds); // Add section ids and names to the sheet.
+ 
+  sheet.getRange(startingRow,3,allEnrollments.length,allEnrollments[0].length).setValues(allEnrollments); // Add enrollment ids and Schoology ids to the sheet.
+  
+  Logger.log(allEnrollments);
+
+
+  if(i >= sectionIds.length){ // If script completed for the final time...
+   
+    scriptProperties.setProperty("getAllEnrollmentsStartingIndex", 0); // ...set starting index to 0...
+    scriptProperties.setProperty("getAllEnrollmentsStartingRow", 0); // ... and starting row for spreadsheet to 0 (which changes to 1 right away during a run so 0 is correct!).
+    
+    deleteAllProjectTriggers(); //Delete all timed triggers we made.
+    
+  }
+  
+
+}
+
+
+/********
+
+modifyUser() Modifies a user .
+
+*******/
+
+
+function modifyUser(schoologyId, key, newValue){
+  
+  // Get user's data returned as a json string.
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+
+  var apiUrl = 'users/'+schoologyId;
+  
+  var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+  var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+    
+  var object = JSON.parse(response); // Make response text into json object.
+  
+  
+  
+  Logger.log("OLD USER DATA" + "\n\n" + response + "\n\n" + "REPLACING " + object[key] + " WITH " + newValue + "\n\n");
+  
+  
+  
+  object[key] = newValue; // Modify the json object with newValue.
+
+  // Modify user data on Schoology's servers.
+  var payload = JSON.stringify(object); // Create payload to be used to modify the user's data. Payload is composed of user's info with key's new value being value.
+  
+  var options =
+      {
+        "method" : "put",
+        "contentType" : "application/json",
+        "payload" : payload
+      };
+  
+  
+  Utilities.sleep(1000);
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+
+  var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+  
+  UrlFetchApp.fetch(url, options); // Make the api call and store the response from the server.
+  
+ /*  OPTIONAL SECTION COMMENTED OUT     OPTIONAL SECTION COMMENTED OUT    OPTIONAL SECTION COMMENTED OUT  OPTIONAL SECTION COMMENTED OUT
+ 
+  // Check to see if it worked.
+  Utilities.sleep(1000);
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+
+  var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+   
+  var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+ 
+  Logger.log("NEW USER DATA" + "\n\n" + response + "\n\n");
+  
+  OPTIONAL SECTION COMMENTED OUT   OPTIONAL SECTION COMMENTED OUT   OPTIONAL SECTION COMMENTED OUT  OPTIONAL SECTION COMMENTED OUT */
+  
+  return(response);
+  
+}
+
+
+/********
+
+getAttendanceForDate() grabs a section's attendance for a given date.
+
+*******/
+
+
+function getAttendanceForDate(sectionId, date){ // Date must be in YYYY-MM-DD format.
+  
+  var d = new Date();
+  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
+  currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
+  
+  var apiUrl = 'sections/' + sectionId + '/attendance?start=' + date + '&end=' + date; // Grabs the course id of the current course and adds it to the api call.
+  
+  var url = baseUrl + apiUrl + '&oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+  
+  var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
+  
+  var data = JSON.parse(response).date[0].statuses.status; // Grab the info we're really after.  
+
+  var codeList = ["Present", "Absent", "Tardy", "Excused Tardy"]; // According to Schoology's attendance codes 1 = Present, 2 = Absent, etc...
+  var attendance = [];
+  
+  for(var i = 0; i < data.length; i++){
+    
+    for(var j = 0; j < data[i].attendances.attendance.length; j++){
+    
+    attendance.push([data[i].attendances.attendance[j].enrollment_id, codeList[data[i].attendances.attendance[j].status-1], data[i].attendances.attendance[j].comment]); // comment, enrollment_id, status
+      
+    }
+  }
+  
+  return(attendance);
+  
+}
+
+// Adapted from somewhere on the internet. This is one place this code shows up but it's not where I found it. http://stackoverflow.com/questions/10632792/csv-file-create-in-google-apps
+function rangeToCSV(rangeValues){
+  
+  try {
+
+    var csvFile = undefined;
+
+    // Loop through the data in the range and build a string with the CSV range
+    if (rangeValues.length > 1) {
+      var csv = "";
+      for (var row = 0; row < rangeValues.length; row++) {
+        for (var col = 0; col < rangeValues[row].length; col++) {
+          if (rangeValues[row][col].toString().indexOf(",") != -1) {
+            rangeValues[row][col] = "\"" + rangeValues[row][col] + "\"";
+          }
+        }
+
+        // Join each row's columns
+        // Add a carriage return to end of each row, except for the last one
+        if (row < rangeValues.length-1) {
+          csv += rangeValues[row].join(",") + "\r\n";
+        }
+        else {
+          csv += rangeValues[row];
+        }
+      }
+      csvFile = csv;
+    }
+    return csvFile;
+  }
+  catch(err) {
+    Logger.log(err);
+  }
+  
+  
+}
+
+function getOrCreateSheetByName(ss, sheetName){
+  
+  var allSheets = ss.getSheets();
+  var allNames = [];
+  
+  for(var sheetsIndex = 0; sheetsIndex< allSheets.length; sheetsIndex++){
+    
+    allNames.push(allSheets[sheetsIndex].getName()); 
+    
+  }
+  
+  if(allNames.indexOf(sheetName) < 0){
+    
+    var sheet = ss.insertSheet(sheetName);
+    
+  }
+  
+  else{
+    
+    var sheet = ss.getSheetByName(sheetName);    
+    sheet.getRange(1,1,1000,30).setNumberFormat('@STRING@');
+  }
+  
+  return(sheet);
+  
+}
+
+
+
+function deleteAllProjectTriggers() {
+  // Loop over all triggers.
+  var allTriggers = ScriptApp.getProjectTriggers();
+  for (var triggerIndex = 0; triggerIndex < allTriggers.length; triggerIndex++) {
+    
+    ScriptApp.deleteTrigger(allTriggers[triggerIndex]);
+    
+  }
+}
