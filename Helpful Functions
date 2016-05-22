@@ -5,9 +5,9 @@ as well as capturing requests using Postman. (https://chrome.google.com/webstore
 
 */
 
-var consumerKey = 'YOURCONSUMERKEYHERE'; // Can be found at http://schoology.yourDomainName.whatever/api
+var consumerKey = '44da8dffeba4f148bd9a2e9ff6f35b65056e0a579'; // Can be found at http://schoology.yourDomainName.whatever/api
 
-var consumerSecret = 'YOURCONSUMERSECRETHERE'; // Can be found at http://schoology.yourDomainName.whatever/api
+var consumerSecret = 'f8ab24b57199616c140530c32a303dae'; // Can be found at http://schoology.yourDomainName.whatever/api
 
 var signatureMethod = 'PLAINTEXT'; // This is the signature generation method used for Oauth. For https connection, plaintext works fine. See https://developers.schoology.com/api-documentation/authentication for details. 
 
@@ -15,7 +15,7 @@ var baseUrl = 'https://api.schoology.com/v1/'; // API calls are made to urls whi
 
 var authVersion = '1.0'; // Current Oauth version used.
 
-var spreadsheetId = 'YOURSPREADSHEETIDHERE'; // Google spreadsheet where Schoology info should be dumped.
+var spreadsheetId = '1uzsRapI1IKj272-aTo1J5Vhvbb-EqleLNubV_M-dKJs'; // Google spreadsheet where Schoology info should be dumped.
 
 
 /********
@@ -27,7 +27,7 @@ getSchoolId() logs and returns your school's id.
 function getSchoolId(){
   
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000;
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
 
   var apiUrl = 'schools';
@@ -54,10 +54,10 @@ function getBuildings(){
 
   var schoolId = getSchoolId();
   
-  Utilities.sleep(1000); // Must delay in order to get different timestamps sent to Schoology.
+   // Must delay in order to get different timestamps sent to Schoology.
   
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000; // Get current time in seconds.
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
 
   var apiUrl = 'schools/' + schoolId + '/buildings';
@@ -91,7 +91,7 @@ getAllCourses() logs and returns all your school's courses and related informati
 function getAllCourses(){ 
 
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000; // Get current time in seconds.
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
  
   var apiUrl = 'courses';
@@ -106,7 +106,7 @@ function getAllCourses(){
   
   var courses = [];
   
-  var startVal = 1;
+  var startVal = 0;
   var limit = 200; // This seems to be Schoology's upper limit of values that can be returned.
   
   var keys = [];
@@ -121,10 +121,10 @@ function getAllCourses(){
 
   while(courses.length < totalCourses){ // Make sure to get all courses. You can only get 200 at a time.
 
-    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+     // Need timestamps to be different and timestamps are to the nearest second so wait one second.
    
     var d = new Date();
-    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+    var timestamp = d.getTime()/1000; // Get current time in seconds.
     var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
     
     var url = baseUrl + apiUrl + '?start=' + startVal + '&limit=' + limit + '&oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
@@ -178,7 +178,7 @@ getAllUsers() logs and returns all your school's users, and dumps each field of 
 function getAllUsers(){ 
   
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000; // Get current time in seconds.
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
   
   var apiUrl = 'users';
@@ -192,7 +192,7 @@ function getAllUsers(){
   
   var users = [];
   
-  var startVal = 1;
+  var startVal = 0;
   var limit = 200;
   
   var keys = [];
@@ -208,9 +208,9 @@ function getAllUsers(){
   
   while(users.length < totalUsers){ // Make sure to get all users. You can only get 200 at a time.
 
-    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+     // Need timestamps to be different and timestamps are to the nearest second so wait one second.
     var d = new Date();
-    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+    var timestamp = d.getTime()/1000; // Get current time in seconds.
     var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
     
     var url = baseUrl + apiUrl + '?start=' + startVal + '&limit=' + limit + '&oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
@@ -267,7 +267,7 @@ getAllSections() logs and returns all your school's course sections, and dumps e
 function getAllSections(){ 
 
   var d = new Date();
-  var startTime = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var startTime = Math.floor(d.getTime()/1000).toFixed(); // Get current time in seconds.
   var currentTime = startTime; // Initialize currentTime variable for use in checking for script timeouts.
   
   var scriptProperties = PropertiesService.getScriptProperties(); // If this is a brand new run, values below will be null. If last time this was run, it fully completed, these will be 0 each. If we're in the middle of a run, then these store values where we left off.
@@ -309,9 +309,9 @@ function getAllSections(){
    
     while(total == 0){  // Must get a course with at least 1 section in order to grab the section keys (column titles in the spreadsheet) at add them as the first row of the sections data.
       
-      Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+       // Need timestamps to be different and timestamps are to the nearest second so wait one second.
       var d = new Date();
-      var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+      var timestamp = d.getTime()/1000; // Get current time in seconds.
       var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
       currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
       
@@ -377,9 +377,9 @@ function getAllSections(){
  
   for(i; i < courseIds.length; i++){ // Go through courseIds from where we left off above or startingIndex (i) through the end of the array (unless we time out).
     
-    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+     // Need timestamps to be different and timestamps are to the nearest second so wait one second.
     var d = new Date();
-    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+    var timestamp = d.getTime()/1000; // Get current time in seconds.
     var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
     currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
   
@@ -462,7 +462,7 @@ getAllEnrollments() logs and returns all your school course sections' enrollment
 function getAllEnrollments(){ 
 
   var d = new Date();
-  var startTime = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var startTime = Math.floor(d.getTime()/1000).toFixed(); // Get current time in seconds.
   var currentTime = startTime; // Initialize currentTime variable for use in checking for script timeouts.
   
   var scriptProperties = PropertiesService.getScriptProperties(); // If this is a brand new run, values below will be null. If last time this was run, it fully completed, these will be 0 each. If we're in the middle of a run, then these store values where we left off.
@@ -506,7 +506,7 @@ function getAllEnrollments(){
     allEnrollments[0].push("Schoology Id");
     allEnrollments[0].push("etc...");
     
-    for(var rest = 5; rest < 100; rest++){ // Fill in the rest of the values of the first row of the array to be '' that we eventually get a nice rectangular array of sectionIds.length rows and 100 columns;
+    for(var rest = 5; rest < 200; rest++){ // Fill in the rest of the values of the first row of the array to be '' that we eventually get a nice rectangular array of sectionIds.length rows and 200 columns;
         
         allEnrollments[0].push('');
         
@@ -525,22 +525,27 @@ function getAllEnrollments(){
   
   for(var i = startingIndex + 1; i < sectionIds.length; i++){ // + 1 in order to skip first item because it's the name of the column.
     
-    Utilities.sleep(1000); // Need timestamps to be different and timestamps are to the nearest second so wait one second.
+    // // Need timestamps to be different and timestamps are to the nearest second so wait one second.
     var d = new Date();
-    var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+   //var timestamp = d.getTime()/1000; // Get current time in seconds.
+    
+    var timestamp = d.getTime()/1000;
     var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
     currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
     
     var apiUrl = 'sections/' + sectionIds[i][0] + '/enrollments'; // Grabs the course id of the current course and adds it to the api call.
+
+    var startVal = 0;
+    var limit = 100; // Schoology paginates results, limits to 20 by default. 
     
-    var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
+    var url = baseUrl + apiUrl + '?start=' + startVal + '&limit=' + limit + '&oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
    
     var response = UrlFetchApp.fetch(url); // Make the api call and store the response from the server.
     
     var data = JSON.parse(response).enrollment; // Grab the info we're really after.  
     
     var enrollments = [];
-    
+   
     for(var k = 0; k < data.length; k++){
       
       enrollments.push(data[k].id);
@@ -548,7 +553,7 @@ function getAllEnrollments(){
       
     }
     
-    for(var rest = 2*k; rest < 100; rest++){ // Fill in the rest of the values of the array to be '' that we get a nice rectangular array of sectionIds.length rows and 100 columns;
+    for(var rest = 2*k; rest < 200; rest++){ // Fill in the rest of the values of the array to be '' that we get a nice rectangular array of sectionIds.length rows and 200 columns;
      
       enrollments.push('');
       
@@ -584,9 +589,11 @@ function getAllEnrollments(){
     
   sheet.getRange(1,1,sectionIds.length,2).setValues(sectionIds); // Add section ids and names to the sheet.
  
+  Logger.log(allEnrollments);
+  
   sheet.getRange(startingRow,3,allEnrollments.length,allEnrollments[0].length).setValues(allEnrollments); // Add enrollment ids and Schoology ids to the sheet.
   
-  Logger.log(allEnrollments);
+  //Logger.log(allEnrollments);
 
 
   if(i >= sectionIds.length){ // If script completed for the final time...
@@ -613,7 +620,7 @@ function modifyUser(schoologyId, key, newValue){
   
   // Get user's data returned as a json string.
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000; // Get current time in seconds.
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
 
   var apiUrl = 'users/'+schoologyId;
@@ -643,9 +650,8 @@ function modifyUser(schoologyId, key, newValue){
       };
   
   
-  Utilities.sleep(1000);
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
 
   var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
@@ -655,9 +661,9 @@ function modifyUser(schoologyId, key, newValue){
  /*  OPTIONAL SECTION COMMENTED OUT     OPTIONAL SECTION COMMENTED OUT    OPTIONAL SECTION COMMENTED OUT  OPTIONAL SECTION COMMENTED OUT
  
   // Check to see if it worked.
-  Utilities.sleep(1000);
+
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000; // Get current time in seconds.
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
 
   var url = baseUrl + apiUrl + '?oauth_consumer_key=' + consumerKey + '&oauth_signature_method=' + signatureMethod + '&oauth_timestamp=' + timestamp + '&oauth_nonce=' + nonce + '&oauth_version=' + authVersion + '&oauth_signature=' + consumerSecret + '%26'; 
@@ -683,7 +689,7 @@ getAttendanceForDate() grabs a section's attendance for a given date.
 function getAttendanceForDate(sectionId, date){ // Date must be in YYYY-MM-DD format.
   
   var d = new Date();
-  var timestamp = Math.floor(d.getTime()/1000).toFixed(); // Round current time to seconds.
+  var timestamp = d.getTime()/1000; // Get current time in seconds.
   var nonce = timestamp; // Schoology requires a unique nonce value for each timestamp. Could do something fancier.
   currentTime = timestamp; // Grab current time to make sure the run time of the script is less than 5 minutes.
   
